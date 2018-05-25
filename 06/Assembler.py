@@ -233,6 +233,33 @@ class Code:
 		else:
 			return "000"
 
+
+def c_writer(parser_obj):
+	"""
+	Given a parser object applies Code module to currentCommand and returns 
+	string containing binary representation of command
+
+	specifically for C instructions
+	"""
+	prefix = '111'
+	code = Code(parser.dest(), parser.comp(), parser.jump())
+	dest_bits = code.dest()
+	comp_bits = code.comp()
+	jump_bits = code.jump()
+	return prefix + dest_bits + comp_bits + jump_bits
+
+def a_writer(parser_obj):
+	"""
+	Given a parser object applies Code module to currentCommand and returns 
+	string containing binary representation of command
+
+	specifically for A instructions
+	"""
+	prefix = '0'
+	address = parser.symbol()
+	a_bits = format(int(address), '015b')
+	return prefix + a_bits
+	
 	
 input_file_path = sys.argv[1]
 file_name = input_file_path.replace('.asm','')
@@ -243,16 +270,9 @@ with open('{}.hack'.format(file_name), 'w') as f:
 	while parser.hasMoreCommands():
 		parser.advance()
 		if parser.commandType() == 'C_COMMAND':
-			prefix = '111'
-			code = Code(parser.dest(), parser.comp(), parser.jump())
-			dest_bits = code.dest()
-			comp_bits = code.comp()
-			jump_bits = code.jump()
-			f.write(prefix + comp_bits + dest_bits + jump_bits + '\n')
+			command_bits = c_writer(parser)
 		elif parser.commandType() == 'A_COMMAND':
-			prefix = '0'
-			address = parser.symbol()
-			a_bits = format(int(address), '015b')
-			f.write(prefix + a_bits + '\n')
-
+			command_bits = a_writer(parser)
+		f.write(command_bits + '\n')
+			
 f.close()
