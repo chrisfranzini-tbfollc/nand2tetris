@@ -1,5 +1,5 @@
 import unittest
-from Assembler import Parser, Code
+from Assembler import Parser, Code, SymbolTable
 
 class TestParser(unittest.TestCase):
 
@@ -208,5 +208,37 @@ class TestParser(unittest.TestCase):
     #     c = test_parser.dest()
     #     self.assertEqual(Code.jump(self, c), "000")   
     #     
+
+class TestSymbolTable(unittest.TestCase):
+
+    def test_constructor(self):
+        symbol_table = SymbolTable()
+        self.assertEqual(symbol_table.table, dict())
+
+    def test_add_entry(self):
+        symbol_table = SymbolTable()
+        symbol = 'LOOP'
+        address = '12'
+        symbol_table.addEntry(symbol, address)
+        self.assertEqual(symbol_table.table, {'LOOP': '12'})
+
+    def test_contains(self):
+        symbol_table = SymbolTable()
+        symbol = 'LOOP'
+        address = '12'
+        self.assertFalse(symbol_table.contains(symbol))
+        symbol_table.addEntry(symbol, address)
+        self.assertTrue(symbol_table.contains(symbol))
+
+    def test_get_address(self):
+        symbol_table = SymbolTable()
+        symbol = 'LOOP'
+        address = '12'
+        self.assertIsNone(symbol_table.getAddress(symbol))
+        symbol_table.addEntry(symbol, address)
+        self.assertEqual(symbol_table.getAddress(symbol), '12')
+
+
+
 if __name__ == '__main__':
     unittest.main()

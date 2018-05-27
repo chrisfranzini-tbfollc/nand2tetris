@@ -31,7 +31,7 @@ class Parser:
 			imatch = re.search(ipat, l).group() 
 		
 			if imatch:
-				self.proc_file.append(imatch)
+				self.proc_file.append(imatch.strip())
 
 		self.length = len(self.proc_file)
 
@@ -82,10 +82,11 @@ class Parser:
 		command = self.current_command
 	
 		if self.commandType() == 'A_COMMAND':
-			if 'R' in command:
-				return command[2:]
-			else:
-				return command[1:]
+			# if 'R' in command:
+			# 	return command[2:]
+			# else:
+			# 	return command[1:]
+			return command[1:]
 		elif self.commandType() == 'L_COMMAND':
 			return command[1:-1]
 		else:
@@ -144,6 +145,12 @@ class Parser:
 				return None
 		else:
 			return None
+
+	def reset(self):
+		""" Resets parser to initial state """
+		self.line_counter = -1
+		self.current_command = None
+
 
 class Code:
 	"""
@@ -233,6 +240,61 @@ class Code:
 		else:
 			return "000"
 
+class SymbolTable:
+
+	def __init__(self):
+		""" Creates a new empty symbol table. """
+		self.table = {
+			'SP': '0',
+			'LCL': '1',
+			'ARG': '2',
+			'THIS': '3',
+			'THAT': '4',
+			'R0': '0',
+			'R1': '1',
+			'R2': '2',
+			'R3': '3',
+			'R4': '4',
+			'R5': '5',
+			'R6': '6',
+			'R7': '7',
+			'R8': '8',
+			'R9': '9',
+			'R10': '10',
+			'R11': '11',
+			'R12': '12',
+			'R13': '13',
+			'R14': '14',
+			'R15': '15',
+			'SCREEN': '16384',
+			'KBD': '24576'	
+		}
+
+	def addEntry(self, symbol, address):
+		""" Adds the pair (symbol, address) to the table."""
+		self.table[symbol] = address
+
+	def contains(self, symbol):
+		"""Does the symbol table contain the given symbol?"""
+		return symbol in self.table.keys()
+
+	def getAddress(self, symbol):
+		"""Returns the address associated with the symbol."""
+		if self.contains(symbol):
+			return self.table[symbol]
+		else: 
+			return None
+
+	def getOpenAddress(self):
+		min = 16
+		max = int(self.table['SCREEN'])
+		for n in range(min, max):
+			if str(n) not in self.table.values():
+				return str(n)
+			else:
+				n += 1
+		return None
+
 
 def c_writer(parser_obj):
 	"""
@@ -242,37 +304,72 @@ def c_writer(parser_obj):
 	specifically for C instructions
 	"""
 	prefix = '111'
-	code = Code(parser.dest(), parser.comp(), parser.jump())
+	code = Code(parser_obj.dest(), parser_obj.comp(), parser_obj.jump())
 	dest_bits = code.dest()
 	comp_bits = code.comp()
 	jump_bits = code.jump()
-	return prefix + dest_bits + comp_bits + jump_bits
+	return prefix + comp_bits + dest_bits + jump_bits
 
-def a_writer(parser_obj):
+def a_writer(parser_obj, symbol_table):
 	"""
 	Given a parser object applies Code module to currentCommand and returns 
 	string containing binary representation of command
 
+	Additionally, function replaces symbolic address according to symbol
+	table specifications.
+
 	specifically for A instructions
 	"""
 	prefix = '0'
-	address = parser.symbol()
-	a_bits = format(int(address), '015b')
+	address = parser_obj.symbol()
+	if not is_int(address):
+		symbol = address
+		if symbol_table.contains(symbol):
+			a_num = symbol_table.getAddress(symbol)
+		else:
+			next_address = symbol_table.getOpenAddress()
+			symbol_table.addEntry(symbol, next_address)
+			a_num = next_address
+	else:
+		a_num = address
+	a_bits = format(int(a_num), '015b')
 	return prefix + a_bits
+
+def is_int(x):
+	try:
+		int(x)
+		return True
+	except ValueError:
+		return False
 	
-	
+# start implementation	
 input_file_path = sys.argv[1]
 file_name = input_file_path.replace('.asm','')
+parser = Parser(input_file_path)
+parser.process_file()
 
+# first pass (symbols)
+counter = 0
+symbol_table = SymbolTable()
+while parser.hasMoreCommands():
+	parser.advance()
+	if parser.commandType() == 'L_COMMAND':
+		symbol_table.addEntry(parser.symbol(), counter)
+	else:
+		counter += 1
+
+# reset parser
+parser.reset()
+
+# second pass
 with open('{}.hack'.format(file_name), 'w') as f:
-	parser = Parser(input_file_path)
-	parser.process_file()
 	while parser.hasMoreCommands():
 		parser.advance()
 		if parser.commandType() == 'C_COMMAND':
-			command_bits = c_writer(parser)
+			f.write(c_writer(parser) + '\n')
 		elif parser.commandType() == 'A_COMMAND':
-			command_bits = a_writer(parser)
-		f.write(command_bits + '\n')
+			f.write(a_writer(parser, symbol_table) + '\n')
+		else:
+			pass
 			
 f.close()
